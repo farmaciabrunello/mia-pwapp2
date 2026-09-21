@@ -6,24 +6,35 @@
     <meta name="apple-mobile-web-app-title" content="Farmacia Brunello">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#ffffff">
-    <link rel="apple-touch-icon" href="icon-180.png">
+
+    <!-- Icone iOS Home Screen -->
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+    <link rel="apple-touch-icon-precomposed" sizes="180x180" href="icons/apple-touch-icon.png">
+
+    <!-- Favicon standard e SVG -->
+    <link rel="icon" type="image/png" sizes="96x96" href="icons/favicon-96x96.png">
+    <link rel="icon" type="image/svg+xml" href="icons/favicon.svg">
+    <link rel="shortcut icon" href="icons/favicon.ico">
+
+    <!-- Collegamento al Manifest -->
     <link rel="manifest" href="manifest.json">
     
     <title>Farmacia Brunello</title>
     <link rel="stylesheet" href="style.css">
-
+    
+    <!-- OneSignal Web SDK v16 -->
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
     <script>
       window.OneSignalDeferred = window.OneSignalDeferred || [];
       OneSignalDeferred.push(async function(OneSignal) {
         await OneSignal.init({
-          appId: "09a603b0-4db1-44df-b6de-0190f3945853",
+          appId: "7baa9639-10e1-4357-bfa8-6ab1b6c4c688",
           serviceWorkerPath: "OneSignalSDKWorker.js",
-          serviceWorkerParam: { scope: "/mia-pwapp2/" }
+          serviceWorkerParam: { scope: "/app/" }
         });
-        updateButtons();
       });
     </script>
+    
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
 </head>
 <body>
@@ -32,7 +43,7 @@
     <div class="header-content">
         <div class="logo">
             <a href="index.html" title="Torna alla Home">
-                <img src="logo-farmacia.svg" alt="Farmacia Brunello" class="logo-image">
+                <img src="assets/vectors/logo-farmacia.svg" alt="Farmacia Brunello" class="logo-image">
             </a>
         </div>
       <div class="header-icons">
@@ -58,11 +69,17 @@
 <main class="scrollable-content">
     <div id="home-content">
         <section class="section notification-panel">
-            <div style="background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <div style="background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); text-align: center;">
                 <h3 style="margin-bottom: 10px; font-size: 1rem;">Resta aggiornato</h3>
-                <div id="loading-status">Verifica stato...</div>
-                <button id="subscribe-btn" class="btn btn-subscribe" style="display:none;">🔔 Attiva Notifiche</button>
-                <button id="unsubscribe-btn" class="btn btn-unsubscribe" style="display:none;">🔕 Disattiva Notifiche</button>
+                <div id="loading-status" style="font-size: 0.9rem; color: #666;">Verifica stato...</div>
+                
+                <button id="subscribe-btn" onclick="gestisciIscrizione()" class="btn btn-subscribe" style="display:none; cursor: pointer; padding: 10px 15px; margin: 10px auto; background-color: #28a745; color: white; border: none; border-radius: 8px; font-weight: bold;">
+                    🔔 Attiva Notifiche
+                </button>
+                
+                <button id="unsubscribe-btn" onclick="gestisciDisiscrizione()" class="btn btn-unsubscribe" style="display:none; cursor: pointer; padding: 10px 15px; margin: 10px auto; background-color: #dc3545; color: white; border: none; border-radius: 8px; font-weight: bold;">
+                    🔕 Disattiva Notifiche
+                </button>
             </div>
         </section>
 
@@ -122,38 +139,81 @@
 </footer>
 
 <script>
-    // 1. OneSignal & Notifiche
+    // 1. Logica OneSignal
     window.OneSignalDeferred = window.OneSignalDeferred || [];
 
-    function updateButtons() {
+    async function updateButtons() {
         OneSignalDeferred.push(async function(OneSignal) {
-            const isOptedIn = OneSignal.User.PushSubscription.optedIn;
-            const hasPermission = OneSignal.Notifications.permission;
-            document.getElementById('loading-status').style.display = 'none';
+            try {
+                const isOptedIn = OneSignal.User.PushSubscription.optedIn;
+                const permission = OneSignal.Notifications.permission;
+                
+                const statusElem = document.getElementById('loading-status');
+                const subBtn = document.getElementById('subscribe-btn');
+                const unsubBtn = document.getElementById('unsubscribe-btn');
 
-            document.getElementById('subscribe-btn').style.display = (isOptedIn && hasPermission) ? 'none' : 'block';
-            document.getElementById('unsubscribe-btn').style.display = (isOptedIn && hasPermission) ? 'block' : 'none';
+                if (statusElem) statusElem.style.display = 'none';
+
+                // Se l'utente è iscritto ED ha dato il permesso al browser
+                if (isOptedIn && permission) {
+                    if (subBtn) subBtn.style.display = 'none';
+                    if (unsubBtn) unsubBtn.style.display = 'block';
+                } else {
+                    if (subBtn) subBtn.style.display = 'block';
+                    if (unsubBtn) unsubBtn.style.display = 'none';
+                }
+            } catch (err) {
+                console.error("Errore durante l'aggiornamento dei pulsanti:", err);
+            }
         });
     }
 
+    // Registra i listener per OneSignal
     OneSignalDeferred.push(function(OneSignal) {
+        updateButtons();
+        
+        // Ascolta il cambio di stato dell'iscrizione
         OneSignal.User.PushSubscription.addEventListener("change", updateButtons);
+        
+        // Ascolta il cambio di permessi della notifica
+        OneSignal.Notifications.addEventListener("permissionChange", updateButtons);
     });
 
-    document.getElementById('subscribe-btn').addEventListener('click', () => {
-        OneSignalDeferred.push(async (OneSignal) => {
-            await OneSignal.User.PushSubscription.optIn();
-            await OneSignal.Notifications.requestPermission();
-            updateButtons();
-        });
-    });
+    async function gestisciIscrizione() {
+        OneSignalDeferred.push(async function(OneSignal) {
+            try {
+                // Controllo specifico per Safari su iOS
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+                const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
 
-    document.getElementById('unsubscribe-btn').addEventListener('click', () => {
-        OneSignalDeferred.push((OneSignal) => {
-            OneSignal.User.PushSubscription.optOut();
-            updateButtons();
+                if (isIOS && !isStandalone) {
+                    alert("Per attivare le notifiche su iPhone, prima aggiungi questa app alla schermata Home (premi il tasto Condividi e seleziona 'Aggiungi a Schermata Home').");
+                    return;
+                }
+
+                const permission = await OneSignal.Notifications.requestPermission();
+                if (permission) {
+                    await OneSignal.User.PushSubscription.optIn();
+                    await updateButtons();
+                } else {
+                    alert("Le notifiche sono state bloccate. Puoi abilitarle dalle impostazioni del tuo dispositivo/browser.");
+                }
+            } catch (err) {
+                console.error("Errore nell'attivazione:", err);
+            }
         });
-    });
+    }
+
+    async function gestisciDisiscrizione() {
+        OneSignalDeferred.push(async function(OneSignal) {
+            try {
+                await OneSignal.User.PushSubscription.optOut();
+                await updateButtons();
+            } catch (err) {
+                console.error("Errore nella disattivazione:", err);
+            }
+        });
+    }
 
     // 2. Navigazione tra sezioni
     const navItems = document.querySelectorAll('.nav-item');
@@ -181,7 +241,6 @@
     // 3. Caricamento Eventi
     async function loadEvents() {
         const eventsList = document.getElementById('events-list');
-        // Aggiunto ?sheet=Eventi per sicurezza
         const API_URL = 'https://sheetdb.io/api/v1/mcvst24hmpts3?sheet=Eventi';
         const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1586015555751-63bb77f4322a?q=80&w=1000&auto=format&fit=crop';
 
@@ -227,7 +286,6 @@
                 const inizio = new Date(turno.inizio);
                 const fine = new Date(turno.fine);
                 
-                // Logica turno attuale
                 if (today >= inizio && today < fine) {
                     containerAttuale.src = turno.immagine;
                     if(data[index-1]) aggiungiMiniatura(data[index-1], "Sett. Precedente");
