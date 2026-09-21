@@ -138,24 +138,26 @@
     </div>
 </footer>
 
-<script>
-    // 1. Logica OneSignal
+// 1. Logica OneSignal Corretta (SDK v16)
     window.OneSignalDeferred = window.OneSignalDeferred || [];
 
     async function updateButtons() {
         OneSignalDeferred.push(async function(OneSignal) {
             try {
+                // Recupera lo stato reale dell'iscrizione e dei permessi nativi
                 const isOptedIn = OneSignal.User.PushSubscription.optedIn;
-                const permission = OneSignal.Notifications.permission;
+                const permission = OneSignal.Notifications.permissionNative; // 'granted', 'denied', o 'default'
                 
+                console.log("Stato attuale OneSignal:", { isOptedIn, permission });
+
                 const statusElem = document.getElementById('loading-status');
                 const subBtn = document.getElementById('subscribe-btn');
                 const unsubBtn = document.getElementById('unsubscribe-btn');
 
                 if (statusElem) statusElem.style.display = 'none';
 
-                // Se l'utente è iscritto ED ha dato il permesso al browser
-                if (isOptedIn && permission) {
+                // L'utente è iscritto e ha concesso il permesso
+                if (isOptedIn && permission === "granted") {
                     if (subBtn) subBtn.style.display = 'none';
                     if (unsubBtn) unsubBtn.style.display = 'block';
                 } else {
@@ -168,21 +170,28 @@
         });
     }
 
-    // Registra i listener per OneSignal
+    // Registra i listener sugli eventi dell'SDK OneSignal
     OneSignalDeferred.push(function(OneSignal) {
+        // Esegue il primo controllo
         updateButtons();
         
-        // Ascolta il cambio di stato dell'iscrizione
-        OneSignal.User.PushSubscription.addEventListener("change", updateButtons);
+        // Listener per cambio stato iscrizione
+        OneSignal.User.PushSubscription.addEventListener("change", function(event) {
+            console.log("Cambio stato iscrizione rilevato:", event);
+            updateButtons();
+        });
         
-        // Ascolta il cambio di permessi della notifica
-        OneSignal.Notifications.addEventListener("permissionChange", updateButtons);
+        // Listener per cambio permessi notifiche
+        OneSignal.Notifications.addEventListener("permissionChange", function(permission) {
+            console.log("Cambio permessi notifiche rilevato:", permission);
+            updateButtons();
+        });
     });
 
     async function gestisciIscrizione() {
         OneSignalDeferred.push(async function(OneSignal) {
             try {
-                // Controllo specifico per Safari su iOS
+                // Controllo PWA per iOS
                 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
                 const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
 
@@ -191,15 +200,22 @@
                     return;
                 }
 
-                const permission = await OneSignal.Notifications.requestPermission();
-                if (permission) {
+                // 1. Richiedi il permesso al browser
+                const granted = await OneSignal.Notifications.requestPermission();
+                console.log("Esito richiesta permesso:", granted);
+
+                if (granted) {
+                    // 2. Forza l'opt-in nell'SDK OneSignal
                     await OneSignal.User.PushSubscription.optIn();
-                    await updateButtons();
+                    
+                    // Piccolo ritardo per consentire all'SDK di sincronizzare lo stato prima di aggiornare i pulsanti
+                    setTimeout(updateButtons, 500);
                 } else {
-                    alert("Le notifiche sono state bloccate. Puoi abilitarle dalle impostazioni del tuo dispositivo/browser.");
+                    alert("Le notifiche sono state bloccate. Modifica i permessi nelle impostazioni del tuo browser per abilitarle.");
+                    updateButtons();
                 }
             } catch (err) {
-                console.error("Errore nell'attivazione:", err);
+                console.error("Errore nell'attivazione notifiche:", err);
             }
         });
     }
@@ -208,9 +224,9 @@
         OneSignalDeferred.push(async function(OneSignal) {
             try {
                 await OneSignal.User.PushSubscription.optOut();
-                await updateButtons();
+                setTimeout(updateButtons, 500);
             } catch (err) {
-                console.error("Errore nella disattivazione:", err);
+                console.error("Errore nella disattivazione notifiche:", err);
             }
         });
     }
